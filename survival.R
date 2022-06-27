@@ -214,14 +214,24 @@ df_all = df_all %>%
 
 # Submodel train and test sets:
 resp = "Deck"
-predctrs = c("Pclass", "Age", "SibSp", "Parch", "Fare", "lastname_relatives", "number_names")
 df_withdeck = df_all %>%
                   dplyr::filter(!is.na(Deck))
 df_nodeck = df_all %>%
                 dplyr::filter(is.na(Deck))
+predctrs_pre = c("Pclass", "Age", "SibSp", "Parch", "Fare", "lastname_relatives", "number_names")
+df_plt = df_withdeck[df_withdeck$Survived != val_test, c(predctrs_pre, resp)]
+df_plt[, resp] = as.factor(df_plt[, resp])
+ggpairs(
+    data = df_plt,
+    aes(
+        colour = Deck,
+        alpha = 0.8
+    )
+)
+predctrs = c("Pclass", "Fare")
 
 # Cross-validation to find the best k in kNN:
-k_partitions = 5
+k_partitions = 10
 n_obs = nrow(df_withdeck)
 int_n_obs = k_partitions*n_obs%/%k_partitions
 X = 1:n_obs
@@ -232,7 +242,6 @@ if(int_n_obs < n_obs){
 }
 ks = 1:n_obs
 mean_cv_CER = c()
-sd_cv_CER = c()
 for(k_neighbors in ks){
     cv_CER = c()
     for(i in 1:k_partitions){
@@ -247,13 +256,10 @@ for(k_neighbors in ks){
     }
     mean_cv_CER = c(mean_cv_CER,
                     mean(cv_CER))
-    sd_cv_CER = c(sd_cv_CER,
-                  sd(cv_CER))
 }
 df_ks = data.frame(
     ks = ks,
-    mean_cv_CER = mean_cv_CER,
-    sd_cv_CER = sd_cv_CER
+    mean_cv_CER = mean_cv_CER
 )
 df_best = df_ks %>%
               dplyr::filter(mean_cv_CER == min(mean_cv_CER))
@@ -267,6 +273,8 @@ fit = class::knn(train = df_withdeck[, predctrs],
                  cl = df_withdeck[, resp],
                  k = df_best$ks[1])
 df_nodeck$Deck = as.character(fit)
+df_all = rbind(df_withdeck,
+               df_nodeck)
 
 ### Embarked
 
