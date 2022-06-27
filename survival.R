@@ -114,7 +114,7 @@ df_all$title = title
 
 # Number of last name relatives:
 df_all$lastname = lastname
-df_relatives = df_all[boo_train, ] %>%
+df_relatives = df_all %>%
                    dplyr::group_by(lastname) %>%
                    dplyr::summarise(lastname_relatives = n()) %>%
                    as.data.frame()
@@ -167,6 +167,7 @@ df_all = df_all %>%
 
 ###  Ticket
 
+# Simplify the levels:
 df_all$Ticket = as.factor(df_all$Ticket)
 tickets = levels(df_all$Ticket)
 tickets = gsub(x = tickets,
@@ -190,6 +191,24 @@ df_all$Ticket = as.character(df_all$Ticket)
 
 ### Cabin
 
+# Simplify the levels to Deck:
+df_all$Cabin[df_all$Cabin == ""] = NA
+df_all$Cabin = as.factor(df_all$Cabin)
+cabins = levels(df_all$Cabin)
+before = c("A", "B", "C", "D", "E", "F", "G", "T")
+after = c("A", "B", "C", "D", "E", "F", "F", "F")
+for(i in 1:length(before)){
+    cabins[substr(x = cabins,
+                  start = 1,
+                  stop = 1) == before[i]] = after[i]
+}
+levels(df_all$Cabin) = cabins
+df_all$Cabin = as.character(df_all$Cabin)
+df_all = df_all %>%
+             dplyr::rename(Deck = Cabin)
+
+# K-Nearest Neighbors to fill in the gaps in Deck
+K = 5
 
 
 
@@ -220,6 +239,11 @@ for(var in cat_vars){
 }
 
 # Dummies:
+
+
+
+
+
 
 
 
