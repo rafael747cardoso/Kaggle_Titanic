@@ -11,6 +11,8 @@ require(fastDummies)
 require(boot)
 require(glmnet)
 require(Amelia)
+require(class)
+require(Hmisc)
 
 source("./funcs/fix_bad_levels.R")
 source("./funcs/is_dummy.R")
@@ -23,6 +25,7 @@ source("./funcs/make_dim_reduc_plot.R")
 source("./funcs/multi_reg_plots.R")
 source("./funcs/make_comparison_plot.R")
 source("./funcs/make_mest_models_plot.R")
+source("./funcs/make_cv_knn_plot.R")
 
 set.seed(111)
 
@@ -207,14 +210,63 @@ df_all$Cabin = as.character(df_all$Cabin)
 df_all = df_all %>%
              dplyr::rename(Deck = Cabin)
 
-# K-Nearest Neighbors to fill in the gaps in Deck
-K = 5
+### K-Nearest Neighbors to fill in the gaps in Deck
 
+# Submodel train and test sets:
+resp = "Deck"
+predctrs = c("Pclass", "Age", "SibSp", "Parch", "Fare", "lastname_relatives", "number_names")
+df_withdeck = df_all %>%
+                  dplyr::filter(!is.na(Deck))
+df_nodeck = df_all %>%
+                dplyr::filter(is.na(Deck))
 
+# Cross-validation to find the best k in kNN:
+k_partitions = 5
+n_obs = nrow(df_withdeck)
+int_n_obs = k_partitions*n_obs%/%k_partitions
+X = 1:n_obs
+prttns = Hmisc::partition.vector(x = 1:int_n_obs,
+                                 sep = rep(int_n_obs/k_partitions, k_partitions)) 
+if(int_n_obs < n_obs){
+    prttns[k_partitions][[1]] = c(prttns[k_partitions][[1]], X[int_n_obs:n_obs])
+}
+ks = 1:n_obs
+mean_cv_CER = c()
+sd_cv_CER = c()
+for(k_neighbors in ks){
+    cv_CER = c()
+    for(i in 1:k_partitions){
+        test_ind = prttns[i][[1]]
+        fit = class::knn(train = df_withdeck[-test_ind, predctrs],
+                         test = df_withdeck[test_ind, predctrs],
+                         cl = df_withdeck[-test_ind, resp],
+                         k = k_neighbors) %>%
+                  as.character()
+        cv_CER = c(cv_CER,
+                   mean(fit != df_withdeck[test_ind, resp]))
+    }
+    mean_cv_CER = c(mean_cv_CER,
+                    mean(cv_CER))
+    sd_cv_CER = c(sd_cv_CER,
+                  sd(cv_CER))
+}
+df_ks = data.frame(
+    ks = ks,
+    mean_cv_CER = mean_cv_CER,
+    sd_cv_CER = sd_cv_CER
+)
+df_best = df_ks %>%
+              dplyr::filter(mean_cv_CER == min(mean_cv_CER))
 
+make_cv_knn_plot(df_ks = df_ks,
+                 df_best = df_best)
 
-
-
+# Assign the Deck from the kNN fit:
+fit = class::knn(train = df_withdeck[, predctrs],
+                 test = df_nodeck[, predctrs],
+                 cl = df_withdeck[, resp],
+                 k = df_best$ks[1])
+df_nodeck$Deck = as.character(fit)
 
 ### Embarked
 
