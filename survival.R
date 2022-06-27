@@ -39,10 +39,10 @@ id_var = "PassengerId"
 # Concatenate the training and test sets to maintain the structure:
 df_train = df_train[, c(1, 3:(ncol(df_train)), 2)]
 val_test = -1
-boo_train = df_all[response_var] != val_test
 df_test[response_var] = val_test # just to know that it is the test set
 df_all = rbind(df_train,
                df_test)
+boo_train = df_all[response_var] != val_test
 
 # Variable types:
 cat_vars = df_all %>%
@@ -60,21 +60,39 @@ num_vars = df_all %>%
 for(var in num_vars){
     if(sum(is.na(df_all[var])) > 0){
         df_all[is.na(df_all[var]) & boo_train, var] = mean(df_all[boo_train, var], na.rm = TRUE)
-        df_all[is.na(df_all[var]) & !boo_train, var] = mean(df_all[!boo_train, var], na.rm = TRUE)
+        df_all[is.na(df_all[var]) & !boo_train, var] = mean(df_all[boo_train, var], na.rm = TRUE)
     }
 }
 for(var in cat_vars){
     if(sum(is.na(df_all[var])) > 0){
         df_all[is.na(df_all[var] & boo_train), var] = getmode(df_all[boo_train, var])
-        df_all[is.na(df_all[var] & !boo_train), var] = getmode(df_all[!boo_train, var])
+        df_all[is.na(df_all[var] & !boo_train), var] = getmode(df_all[boo_train, var])
     }
 }
 Amelia::missmap(df_all)
 
-### Feature engineering for the nasty categorical variables
+###### Feature engineering for the nasty categorical variables
 
-# Name:
+### Name
+
+# Title:
 passenger_names = df_all$Name
+passenger_names = gsub(x = passenger_names,
+                       pattern = '\\"',
+                       replacement = "")
+passenger_names = gsub(x = passenger_names,
+                       pattern = ")",
+                       replacement = "")
+passenger_names = gsub(x = passenger_names,
+                       pattern = "\\(",
+                       replacement = "")
+passenger_names = gsub(x = passenger_names,
+                       pattern = "-",
+                       replacement = " ")
+passenger_names = gsub(x = passenger_names,
+                       pattern = "'",
+                       replacement = " ")
+df_all$Name = passenger_names
 lastname = c()
 title = c()
 for(i in 1:nrow(df_all)){
@@ -91,8 +109,10 @@ for(i in 1:nrow(df_all)){
 title[title == "Mlle"] = "Miss"
 title[title == "Mme"] = "Mrs"
 title[title %in% c("Don", "Jonkheer", "Lady", "Sir", "the Countess")] = "Nobility"
-title[title %in% c("Col", "Major")] = "Military"
+title[title %in% c("Col", "Major", "Capt")] = "Military"
 df_all$title = title
+
+# Number of last name relatives:
 df_all$lastname = lastname
 df_relatives = df_all[boo_train, ] %>%
                    dplyr::group_by(lastname) %>%
@@ -100,21 +120,87 @@ df_relatives = df_all[boo_train, ] %>%
                    as.data.frame()
 df_all = df_all %>%
              dplyr::left_join(df_relatives,
-                              by = c("lastname" = "lastname")) %>%
+                              by = c("lastname" = "lastname"))
+
+# Number of names:
+number_names = c()
+for(i in 1:nrow(df_all)){
+    passenger_name = passenger_names[i]
+    all_names = strsplit(x = passenger_name,
+                         split = " ")[[1]][-2]
+    number_names = c(number_names,
+                     length(all_names))
+}
+df_all$number_names = number_names
+
+# Spouses by name:
+df_all$with_spouse = NA
+lastnames = sort(unique(lastname))
+for(i in 1:length(lastnames)){
+    person_lastname = lastnames[i]
+    df_i = df_all %>%
+               dplyr::filter(lastname == person_lastname)
+    firstnames = gsub(x = df_i$Name,
+                      pattern = person_lastname,
+                      replacement = "")
+    firstnames = gsub(x = firstnames,
+                      pattern = "\\, ",
+                      replacement = "")
+    firstnames = sapply(X = firstnames,
+                        FUN = function(z) strsplit(x = z, split = " ")[[1]][2]) %>%
+                     as.character()
+    appeared = c()
+    for(j in 1:length(firstnames)){
+        ind = df_i$PassengerId[j]
+        if(firstnames[j] %in% appeared){
+            df_all$with_spouse[ind] = "yes"
+        } else{
+            df_all$with_spouse[ind] = "no"
+        }
+        appeared = c(appeared,
+                     firstnames[j])
+    }
+}
+df_all = df_all %>%
              dplyr::select(-Name,
                            -lastname)
 
-# Ticket:
+###  Ticket
+
+df_all$Ticket = as.factor(df_all$Ticket)
+tickets = levels(df_all$Ticket)
+tickets = gsub(x = tickets,
+               pattern = "\\.",
+               replacement = "")
+tickets = gsub(x = tickets,
+               pattern = "/",
+               replacement = "")
+tickets[!is.na(as.numeric(tickets))] = "N"
+before = c("A ", "A4", "A5", "AQ", "AS", "C ", "CA", "FC", "Fa", "LP", "LI", "PP", "PC", "SC", 
+           "SO", "SP", "ST", "SW", "WC", "WE")
+after = c("A", "A", "A", "A", "A", "C", "C", "F", "F", "F", "F", "P", "P", "SC", "SO",
+          "SO", "ST", "ST", "W", "W")
+for(i in 1:length(before)){
+    tickets[substr(x = tickets,
+                   start = 1,
+                   stop = 2) == before[i]] = after[i]
+}
+levels(df_all$Ticket) = tickets
+df_all$Ticket = as.character(df_all$Ticket)
+
+### Cabin
 
 
 
 
 
-# Cabin:
 
 
 
+### Embarked
 
+df_all$Embarked[df_all$Embarked == "" & boo_train] = getmode(df_all[boo_train, "Embarked"])
+df_all$Embarked[df_all$Embarked == "" & !boo_train] = getmode(df_all[boo_train, "Embarked"])
 
 # Update the variable types:
 cat_vars = df_all %>%
