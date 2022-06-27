@@ -299,24 +299,84 @@ for(var in cat_vars){
 }
 
 # Dummies:
+df_all_cats_dumm = fastDummies::dummy_cols(.data = df_all %>%
+                                                       dplyr::select(all_of(cat_vars)),
+                                           select_columns = cat_vars,
+                                           remove_selected_columns = TRUE,
+                                           remove_first_dummy = TRUE)
+dummy_vars = names(df_all_cats_dumm)
 
+# Now it has a total of length(num_vars) + 1 response + 1 id + length(df_all_cats_dumm) variables:
+df_all = cbind(df_all %>%
+                   dplyr::select(-all_of(cat_vars)),
+               df_all_cats_dumm)
+p_predictors = df_all %>%
+                   dplyr::select(-all_of(response_var),
+                                 -all_of(id_var)) %>%
+                   names()
+predictors_not_dummies = num_vars
 
+# Back to the train/test split:
+df_train = df_all %>%
+               dplyr::filter(eval(parse(text = response_var)) > val_test)
+df_test = df_all %>%
+              dplyr::filter(eval(parse(text = response_var)) == val_test) %>%
+              dplyr::select(-all_of(response_var))
 
+### Standardize the predictors from training and test
 
+# Training:
+df_train_prdnotdum = df_train[predictors_not_dummies]
+X_means_train = c()
+X_sd_train = c()
+for(j in 1:ncol(df_train_prdnotdum)){
+    x = df_train_prdnotdum[, j]
+    X_means_train = c(X_means_train,
+                      mean(x))
+    X_sd_train = c(X_sd_train,
+                   sd(x))
+    df_train_prdnotdum[, j] = (x - X_means_train[j])/X_sd_train[j]
+}
+df_train_stand = data.frame(
+    id_var = df_train[, id_var],
+    df_train_prdnotdum,
+    df_train[, dummy_vars],
+    response_var = df_train[, response_var]
+)
+names(df_train_stand)[which(names(df_train_stand) == "id_var")] = id_var
+names(df_train_stand)[which(names(df_train_stand) == "response_var")] = response_var
 
+# Test:
+df_test_prdnotdum = df_test[predictors_not_dummies]
+for(j in 1:ncol(df_test_prdnotdum)){
+    x = df_test_prdnotdum[, j]
+    df_test_prdnotdum[, j] = (x - X_means_train[j])/X_sd_train[j]
+}
+df_test_stand = data.frame(
+    id_var = df_test[, id_var],
+    df_test_prdnotdum,
+    df_test[, dummy_vars]
+)
+names(df_test_stand)[which(names(df_test_stand) == "id_var")] = id_var
 
-
-
-
+# To each model:
+df_train_stand = df_train_stand %>%
+                     dplyr::select(-all_of(id_var))
+df_train_forward = df_train_stand
+df_train_ridge = df_train_stand
+df_train_lasso = df_train_stand
+df_train_pcalr = df_train_stand
+df_train_rda = df_train_stand
+df_train_knn = df_train_stand
 
 ############ Model selection
 
-###### Best Subset Selection - Logistic Regression
-
-
-
-
 ###### Forward Stepwise Selection - Logistic Regression
+
+
+
+
+
 
 
 
@@ -331,7 +391,7 @@ for(var in cat_vars){
 
 
 
-###### PCA - Logistic Regression
+###### Principal Components Analysis - Logistic Regression
 
 
 
@@ -369,8 +429,6 @@ df_test2 = df_train_stand[ind_test, ]
 X_df_test2 = df_test2 %>%
                  dplyr::select(-all_of(response_var))
 
-# Best Subset Selection - Logistic Regression:
-
 
 
 # Forward Stepwise Selection - Logistic Regression:
@@ -399,7 +457,6 @@ X_df_test2 = df_test2 %>%
 
 # Ensemble model:
 y_pred = data.frame(
-    y_pred_bestsub,
     y_pred_forward,
     y_pred_ridge,
     y_pred_lasso,
@@ -417,8 +474,8 @@ estimated_score_ensemble = kaggle_score(y_pred = y_pred_pls[y_pred_pls > 0],
 
 # Compare the scores:
 df_models_score = data.frame(
-    "models" = c("Best Subset", "Forward Stepwise", "Ridge", "Lasso", "PCA LR", "RDA", "kNN", "Ensemble"),
-    "metric_name" = c(estimated_score_bestsub, estimated_forward, estimated_score_ridge,
+    "models" = c("Forward Stepwise", "Ridge", "Lasso", "PCA LR", "RDA", "kNN", "Ensemble"),
+    "metric_name" = c(estimated_forward, estimated_score_ridge,
                       estimated_score_lasso, estimated_score_pcalr, estimated_score_rda, 
                       estimated_score_knn, estimated_score_ensemble),
     "se_metric_name" = c(NA, NA, NA, NA, NA, NA, NA, NA),
@@ -432,9 +489,6 @@ make_mest_models_plot(df_models = df_models_score,
 df_test_final = df_test_stand %>%
                      dplyr::select(-all_of(id_var))
 
-y_pred_bestsub = predict(fit_bestsub,
-                         df_test_final) %>%
-                     as.numeric()
 y_pred_forward = predict(fit_forward,
                          df_test_final) %>%
                      as.numeric()
@@ -462,11 +516,12 @@ y_pred_knn = predict(fit_knn,
                      df_test_final) %>%
                  as.numeric()
 y_pred = data.frame(
-    y_pred_lasso,
-    y_pred_ridge,
     y_pred_forward,
-    y_pred_pcr,
-    y_pred_pls
+    y_pred_ridge,
+    y_pred_lasso,
+    y_pred_pcalr,
+    y_pred_rda,
+    y_pred_knn
 ) %>%
     rowMeans()
 y_pred[y_pred < 0] = 0
