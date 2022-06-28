@@ -3,6 +3,7 @@
 
 require(ggplot2)
 require(gridExtra)
+require(RColorBrewer)
 require(grid)
 require(plotly)
 require(dplyr)
@@ -13,6 +14,7 @@ require(glmnet)
 require(Amelia)
 require(class)
 require(Hmisc)
+require(ROCR)
 
 source("./funcs/fix_bad_levels.R")
 source("./funcs/is_dummy.R")
@@ -26,6 +28,8 @@ source("./funcs/make_comparison_plot.R")
 source("./funcs/make_mest_models_plot.R")
 source("./funcs/make_cv_knn_plot.R")
 source("./funcs/logit_reg_plots.R")
+source("./funcs/score_accuracy.R")
+source("./funcs/make_roc_curve.R")
 
 set.seed(111)
 
@@ -380,7 +384,7 @@ cv_deviance_logit = function(predictors, df_model){
     fit = glm(formula = paste(response_var, "~.",
                               collapse = ""),
               data = df_model,
-              family = binomial)
+              family = "binomial")
     
     # 10-fold cross-validated deviance:
     cv_deviance = boot::cv.glm(data = df_model,
@@ -401,7 +405,7 @@ p = length(p_predictors)
 fit = glm(formula = paste(response_var, "~1",
                               collapse = ""),
           data = df_train_forward,
-          family = binomial)
+          family = "binomial")
 cv_deviance_null = boot::cv.glm(data = df_train_forward,
                                 glmfit = fit,
                                 K = 10)$delta[1]
@@ -485,11 +489,7 @@ test_deviance_se_forward = (df_eval %>%
 df_model = df_train_forward %>%
                dplyr::select(all_of(best_predictors),
                              all_of(response_var))
-fit_forward = glm(formula = paste(response_var, "~.",
-                                  collapse = ""),
-                  data = df_model)
-
-logit_reg_plots(model_fit = fit_forward)
+logit_reg_plots(df_model = df_model)
 
 
 
@@ -528,16 +528,6 @@ logit_reg_plots(model_fit = fit_forward)
 
 
 ############ Prediction
-
-###### Estimated competition score for the test set
-
-kaggle_score = function(y_pred, y_real){
-    m = table(y_pred,
-              y_real,
-              dnn = c("Prediction", "Truth"))
-    estimated_score = (m[1, 1] + m[2, 2])/(sum(m))
-    return(estimated_score)
-}
 
 # Train/Test split:
 ind_test = sample(x = 1:nrow(df_train_stand),
@@ -584,8 +574,8 @@ y_pred = data.frame(
     y_pred_knn
 ) %>%
     rowMeans()
-estimated_score_ensemble = kaggle_score(y_pred = y_pred,
-                                        y_real = df_test2[response_var])
+estimated_score_ensemble = score_accuracy(y_pred = y_pred,
+                                          y_real = df_test2[response_var])
 
 # Compare the scores:
 df_models_score = data.frame(
@@ -647,48 +637,6 @@ df_pred = data.frame(
 write.csv(df_pred,
           file = "./data/submission_ensemble.csv",
           row.names = FALSE)
-
-
-
-
-# evaluation in the case of choosing the forward logit regression:
-
-# require(ROCR)
-# source("./funcs/make_roc_curve.R")
-# 
-# q = 0.5
-# n_all = nrow(df_train_forward)
-# inds = sample(x = 1:n_all,
-#               size = trunc(q*n_all))
-# df_train = df_train_forward[inds, ]
-# df_test = df_train_forward[-inds, ]
-# 
-# fit = glm(formula = paste(response_var, "~", paste(best_predictors,
-#                                                    collapse = "+"),
-#                           collapse = ""),
-#           data = df_train,
-#           family = binomial)
-# 
-# probs = predict(object = fit,
-#                 newdata = df_test,
-#                 type = "response")
-# threshold = 0.5
-# y_pred = ifelse(probs > threshold,
-#                 1,
-#                 0)
-# conf_matrix = table(y_pred,
-#                     df_test[, response_var],
-#                     dnn = c("Prediction", "Truth"))
-# conf_matrix
-# 
-# CER = mean(y_pred != df_test[, response_var])
-# CER
-# 
-# make_roc_curve(probs = probs,
-#                y_obs = df_test[, response_var])
-
-
-
 
 
 

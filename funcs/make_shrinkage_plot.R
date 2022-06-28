@@ -427,15 +427,15 @@ make_shrinkage_plot = function(cv, model_type, fig_path){
     # Assemble the plots:
     ggsave(fig_path,
            plot = grid.arrange(p1, p2, p3, p4,
-                 nrow = 2,
-                 ncol = 2,
-                 top = textGrob(model_type,
-                                gp = gpar(
-                                    fontsize = 16,
-                                    font = 3
+                               nrow = 2,
+                               ncol = 2,
+                               top = textGrob(model_type,
+                                              gp = gpar(
+                                                  fontsize = 16,
+                                                  font = 3
+                                              )
                                 )
-                            )
-                ),
+           ),
            device = "png",
            scale = 2.7,
            width = 1900,
