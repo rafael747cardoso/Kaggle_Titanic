@@ -491,13 +491,15 @@ df_model = df_train_forward %>%
                              all_of(response_var))
 logit_reg_plots(df_model = df_model)
 
-
-
-
-
-
-
 ###### Ridge - Logistic Regression
+
+df_train_ridge
+
+
+
+
+
+
 
 
 
@@ -529,20 +531,35 @@ logit_reg_plots(df_model = df_model)
 
 ############ Prediction
 
+###### Estimation of the score
+
 # Train/Test split:
+q = 0.5
 ind_test = sample(x = 1:nrow(df_train_stand),
-                  size = trunc(0.4*nrow(df_train_stand)),
+                  size = trunc(q*nrow(df_train_stand)),
                   replace = FALSE)
 df_train2 = df_train_stand[-ind_test, ]
 df_test2 = df_train_stand[ind_test, ]
 X_df_test2 = df_test2 %>%
                  dplyr::select(-all_of(response_var))
 
-
-
 # Forward Stepwise Selection - Logistic Regression:
-
-
+fit = glm(formula = paste(response_var, "~.",
+                          collapse = ""),
+          family = "binomial",
+          data = df_train2)
+probs = predict(object = fit,
+                newdata = df_test2,
+                type = "response")
+threshold = 0.5
+y_pred_forward = ifelse(probs > threshold,
+                        1,
+                        0)
+conf_matrix = table(y_pred_forward,
+                    df_test2[, response_var],
+                    dnn = c("Predicted", "Actual"))
+score_forward = score_accuracy(y_pred = y_pred_forward,
+                               y_real = df_test2[, response_var])
 
 # Ridge - Logistic Regression:
 
@@ -577,12 +594,11 @@ y_pred = data.frame(
 estimated_score_ensemble = score_accuracy(y_pred = y_pred,
                                           y_real = df_test2[response_var])
 
-# Compare the scores:
+# Compare the estimated scores:
 df_models_score = data.frame(
     "models" = c("Forward Stepwise", "Ridge", "Lasso", "PCA LR", "RDA", "kNN", "Ensemble"),
-    "metric_name" = c(estimated_forward, estimated_score_ridge, estimated_score_lasso, 
-                      estimated_score_pcalr, estimated_score_rda, estimated_score_knn,
-                      estimated_score_ensemble),
+    "metric_name" = c(score_forward, score_ridge, score_lasso, score_pcalr, score_rda, 
+                      score_knn, score_ensemble),
     "se_metric_name" = c(NA, NA, NA, NA, NA, NA, NA),
     stringsAsFactors = FALSE
 )
