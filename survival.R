@@ -22,10 +22,10 @@ source("./funcs/make_boxplot.R")
 source("./funcs/make_shrinkage_plot.R")
 source("./funcs/make_subset_selection_plot.R")
 source("./funcs/make_dim_reduc_plot.R")
-source("./funcs/multi_reg_plots.R")
 source("./funcs/make_comparison_plot.R")
 source("./funcs/make_mest_models_plot.R")
 source("./funcs/make_cv_knn_plot.R")
+source("./funcs/logit_reg_plots.R")
 
 set.seed(111)
 
@@ -373,7 +373,123 @@ df_train_knn = df_train_stand
 
 ###### Forward Stepwise Selection - Logistic Regression
 
+# Cross-validated deviance for multiple logistic regression:
+cv_deviance_logit = function(predictors, df_model){
+    # Fit:
+    df_model = df_model[, c(response_var, predictors)]
+    fit = glm(formula = paste(response_var, "~.",
+                              collapse = ""),
+              data = df_model,
+              family = binomial)
+    
+    # 10-fold cross-validated deviance:
+    cv_deviance = boot::cv.glm(data = df_model,
+                               glmfit = fit,
+                               K = 10)$delta[1]
+    return(cv_deviance)
+}
 
+### K-Fold Cross-validated Deviance
+
+cv_deviance = c()
+cv_deviance_se = c()
+num_predictors = c()
+predictors_names = c()
+p = length(p_predictors)
+
+# Null model:
+fit = glm(formula = paste(response_var, "~1",
+                              collapse = ""),
+          data = df_train_forward,
+          family = binomial)
+cv_deviance_null = boot::cv.glm(data = df_train_forward,
+                                glmfit = fit,
+                                K = 10)$delta[1]
+cv_deviance = c(cv_deviance,
+                cv_deviance_null)
+cv_deviance_se = c(cv_deviance_se,
+                   sd(cv_deviance_null))
+num_predictors = c(num_predictors,
+                   0)
+predictors_names = c(predictors_names,
+                     "")
+
+# Forward selection:
+used_predictors = c()
+for(k in 0:(p - 1)){
+    print(p - 1 - k)
+    # The p - k models that augment the predictors in one:
+    cv_deviance_k = c()
+    predictors_k = c()
+    available_predictors = p_predictors[!(p_predictors %in% used_predictors)]
+    for(j in 1:length(available_predictors)){
+        additional_predictor = available_predictors[j]
+        cv_deviance_kj = cv_deviance_logit(predictors = c(used_predictors,
+                                                          additional_predictor),
+                                           df_model = df_train_forward)
+        cv_deviance_k = c(cv_deviance_k,
+                          cv_deviance_kj)
+        predictors_k = c(predictors_k,
+                         additional_predictor)
+    }
+    
+    # Choose the best submodel:
+    chosen_predictor = predictors_k[which(cv_deviance_k == min(cv_deviance_k))]
+    used_predictors = c(used_predictors,
+                        chosen_predictor)
+    cv_deviance = c(cv_deviance,
+                    min(cv_deviance_k))
+    cv_deviance_se = c(cv_deviance_se,
+                       sd(cv_deviance_k)/sqrt(nrow(df_train_forward)))
+    num_predictors = c(num_predictors,
+                       k + 1)
+    predictors_names = c(predictors_names,
+                         paste(used_predictors,
+                               collapse = ","))
+}
+
+# Deviance values:
+df_eval = data.frame(
+    "num_predictors" = num_predictors,
+    "cv_deviance" = cv_deviance,
+    "cv_deviance_se" = cv_deviance_se,
+    "predictors" = predictors_names
+)
+df_eval$cv_deviance_se[is.na(df_eval$cv_deviance_se)] = 0
+
+# Best model with the 1-standard-error rule:
+min_cv_deviance = min(df_eval$cv_deviance)
+for(i in 2:nrow(df_eval)){
+    if(df_eval$cv_deviance[i] - df_eval$cv_deviance_se[i] <= min_cv_deviance){
+        best_p = i - 1
+        break
+    }
+}
+best_predictors = (df_eval %>%
+                       dplyr::filter(num_predictors == best_p))$predictors
+best_predictors = strsplit(x = best_predictors,
+                           split = ",")[[1]]
+
+# Plot:
+make_subset_selection_plot(df_eval = df_eval,
+                           df_plot = df_eval,
+                           best_predictors = best_predictors)
+
+# Estimated Test Deviance:
+test_deviance_forward = (df_eval %>%
+                             dplyr::filter(num_predictors == best_p))$cv_deviance
+test_deviance_se_forward = (df_eval %>%
+                               dplyr::filter(num_predictors == best_p))$cv_deviance_se
+
+# Best model from Forward Stepwise Selection - Logistic Regression:
+df_model = df_train_forward %>%
+               dplyr::select(all_of(best_predictors),
+                             all_of(response_var))
+fit_forward = glm(formula = paste(response_var, "~.",
+                                  collapse = ""),
+                  data = df_model)
+
+logit_reg_plots(model_fit = fit_forward)
 
 
 
@@ -415,8 +531,11 @@ df_train_knn = df_train_stand
 
 ###### Estimated competition score for the test set
 
-kaggle_score = function(y_pred, y_real, n_df, n_obs){
-    estimated_score = 1 #
+kaggle_score = function(y_pred, y_real){
+    m = table(y_pred,
+              y_real,
+              dnn = c("Prediction", "Truth"))
+    estimated_score = (m[1, 1] + m[2, 2])/(sum(m))
     return(estimated_score)
 }
 
@@ -465,20 +584,16 @@ y_pred = data.frame(
     y_pred_knn
 ) %>%
     rowMeans()
-estimated_score_ensemble = kaggle_score(y_pred = y_pred_pls[y_pred_pls > 0],
-                                        y_real = df_test2[response_var],
-                                        n_df = pls::selectNcomp(fit_pls,
-                                                                method = "onesigma",
-                                                                plot = FALSE),
-                                        n_obs = nrow(df_test2))
+estimated_score_ensemble = kaggle_score(y_pred = y_pred,
+                                        y_real = df_test2[response_var])
 
 # Compare the scores:
 df_models_score = data.frame(
     "models" = c("Forward Stepwise", "Ridge", "Lasso", "PCA LR", "RDA", "kNN", "Ensemble"),
-    "metric_name" = c(estimated_forward, estimated_score_ridge,
-                      estimated_score_lasso, estimated_score_pcalr, estimated_score_rda, 
-                      estimated_score_knn, estimated_score_ensemble),
-    "se_metric_name" = c(NA, NA, NA, NA, NA, NA, NA, NA),
+    "metric_name" = c(estimated_forward, estimated_score_ridge, estimated_score_lasso, 
+                      estimated_score_pcalr, estimated_score_rda, estimated_score_knn,
+                      estimated_score_ensemble),
+    "se_metric_name" = c(NA, NA, NA, NA, NA, NA, NA),
     stringsAsFactors = FALSE
 )
 make_mest_models_plot(df_models = df_models_score,
@@ -536,7 +651,41 @@ write.csv(df_pred,
 
 
 
+# evaluation in the case of choosing the forward logit regression:
 
+# require(ROCR)
+# source("./funcs/make_roc_curve.R")
+# 
+# q = 0.5
+# n_all = nrow(df_train_forward)
+# inds = sample(x = 1:n_all,
+#               size = trunc(q*n_all))
+# df_train = df_train_forward[inds, ]
+# df_test = df_train_forward[-inds, ]
+# 
+# fit = glm(formula = paste(response_var, "~", paste(best_predictors,
+#                                                    collapse = "+"),
+#                           collapse = ""),
+#           data = df_train,
+#           family = binomial)
+# 
+# probs = predict(object = fit,
+#                 newdata = df_test,
+#                 type = "response")
+# threshold = 0.5
+# y_pred = ifelse(probs > threshold,
+#                 1,
+#                 0)
+# conf_matrix = table(y_pred,
+#                     df_test[, response_var],
+#                     dnn = c("Prediction", "Truth"))
+# conf_matrix
+# 
+# CER = mean(y_pred != df_test[, response_var])
+# CER
+# 
+# make_roc_curve(probs = probs,
+#                y_obs = df_test[, response_var])
 
 
 
