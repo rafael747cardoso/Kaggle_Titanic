@@ -15,6 +15,7 @@ require(Amelia)
 require(class)
 require(Hmisc)
 require(ROCR)
+require(GGally)
 
 source("./funcs/fix_bad_levels.R")
 source("./funcs/is_dummy.R")
@@ -64,6 +65,7 @@ num_vars = df_all %>%
                names()
 
 # Replace NA's with the mean (for numeric) or the mode (for categoric) in each column:
+Amelia::missmap(df_all)
 for(var in num_vars){
     if(sum(is.na(df_all[var])) > 0){
         df_all[is.na(df_all[var]) & boo_train, var] = mean(df_all[boo_train, var], na.rm = TRUE)
@@ -225,7 +227,7 @@ df_nodeck = df_all %>%
 predctrs_pre = c("Pclass", "Age", "SibSp", "Parch", "Fare", "lastname_relatives", "number_names")
 df_plt = df_withdeck[df_withdeck$Survived != val_test, c(predctrs_pre, resp)]
 df_plt[, resp] = as.factor(df_plt[, resp])
-ggpairs(
+GGally::ggpairs(
     data = df_plt,
     aes(
         colour = Deck,
@@ -493,8 +495,34 @@ logit_reg_plots(df_model = df_model)
 
 ###### Ridge - Logistic Regression
 
-df_train_ridge
+# Matrix data:
+X = as.matrix(df_train_ridge[, p_predictors])
+Y = df_train_ridge[, response_var]
 
+# Fit:
+fit_ridge = glmnet::glmnet(x = X,
+                           y = Y,
+                           alpha = 0,
+                           standardize = FALSE,
+                           family = "gaussian")
+
+# K-Fold Cross-validation:
+cv_ridge = glmnet::cv.glmnet(x = X,
+                             y = Y,
+                             alpha = 0,
+                             type.measure = "mse",
+                             nfolds = 10,
+                             standardize = FALSE,
+                             family = "gaussian")
+
+# Plot:
+make_shrinkage_plot(cv = cv_ridge,
+                    model_type = "Ridge Regression",
+                    fig_path = "./figs/Ridge_Regression.png")
+
+# Estimated Test Prediction Error:
+test_mse_ridge = cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
+test_mse_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
 
 
 
