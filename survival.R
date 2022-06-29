@@ -524,6 +524,10 @@ make_shrinkage_plot(cv = cv_ridge,
 test_CER_ridge = cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
 test_CER_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
 
+# Best model from Ridge - Logistic Regression:
+
+
+
 ###### Lasso - Logistic Regression
 
 # Matrix data:
@@ -555,7 +559,21 @@ make_shrinkage_plot(cv = cv_lasso,
 test_CER_lasso = cv_lasso$cvm[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
 test_CER_se_lasso = cv_lasso$cvsd[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
 
+# Best model from Lasso - Logistic Regression:
+
+
+
 ###### Principal Components Analysis - Logistic Regression
+
+# Principal components from PCA:
+
+# K-Fold Cross-validation:
+
+# Plot:
+
+# Estimated Test CER:
+
+# Best model from PCA - Logistic Regression:
 
 
 
