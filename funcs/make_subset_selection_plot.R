@@ -13,8 +13,8 @@ get_integer_breaks = function(input_vector, interval = 1){
 make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
 
     y_var_name = names(df_eval)[2]
-    names(df_eval)[1:3] = c("num_predictors", "cv_deviance", "cv_deviance_se")
-    names(df_plot)[1:3] = c("num_predictors", "cv_deviance", "cv_deviance_se")
+    names(df_eval)[1:3] = c("num_predictors", "cv_CER", "cv_CER_se")
+    names(df_plot)[1:3] = c("num_predictors", "cv_CER", "cv_CER_se")
     
     # Best models:
     df_best = df_eval %>%
@@ -30,7 +30,7 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
         data = df_eval,
         aes(
             x = num_predictors,
-            y = cv_deviance
+            y = cv_CER
         ),
         color = "gray",
         size = 1,
@@ -40,9 +40,9 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
         data = df_plot,
         aes(
             x = num_predictors,
-            y = cv_deviance,
-            ymin = cv_deviance - cv_deviance_se,
-            ymax = cv_deviance + cv_deviance_se
+            y = cv_CER,
+            ymin = cv_CER - cv_CER_se,
+            ymax = cv_CER + cv_CER_se
         ),
         width = 0.1
     ) +
@@ -50,7 +50,7 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
         data = df_plot,
         aes(
             x = num_predictors,
-            y = cv_deviance
+            y = cv_CER
         ),
         color = "red",
         size = 1
@@ -59,7 +59,7 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
         data = df_best,
         aes(
             x = num_predictors,
-            y = cv_deviance,
+            y = cv_CER,
             colour = "Best model"
         ),
         size = 2,

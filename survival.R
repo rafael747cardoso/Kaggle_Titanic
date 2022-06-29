@@ -379,8 +379,8 @@ df_train_knn = df_train_stand
 
 ###### Forward Stepwise Selection - Logistic Regression
 
-# Cross-validated deviance for multiple logistic regression:
-cv_deviance_logit = function(predictors, df_model){
+# Cross-validated classification error rate for multiple logistic regression:
+cv_CER_logit = function(predictors, df_model){
     # Fit:
     df_model = df_model[, c(response_var, predictors)]
     fit = glm(formula = paste(response_var, "~.",
@@ -389,32 +389,32 @@ cv_deviance_logit = function(predictors, df_model){
               family = "binomial")
     
     # 10-fold cross-validated deviance:
-    cv_deviance = boot::cv.glm(data = df_model,
-                               glmfit = fit,
-                               K = 10)$delta[1]
-    return(cv_deviance)
+    cv_CER = boot::cv.glm(data = df_model,
+                          glmfit = fit,
+                          K = 10)$delta[1]
+    return(cv_CER)
 }
 
 ### K-Fold Cross-validated Deviance
 
-cv_deviance = c()
-cv_deviance_se = c()
+cv_CER = c()
+cv_CER_se = c()
 num_predictors = c()
 predictors_names = c()
 p = length(p_predictors)
 
 # Null model:
 fit = glm(formula = paste(response_var, "~1",
-                              collapse = ""),
+                          collapse = ""),
           data = df_train_forward,
           family = "binomial")
-cv_deviance_null = boot::cv.glm(data = df_train_forward,
-                                glmfit = fit,
-                                K = 10)$delta[1]
-cv_deviance = c(cv_deviance,
-                cv_deviance_null)
-cv_deviance_se = c(cv_deviance_se,
-                   sd(cv_deviance_null))
+cv_CER_null = boot::cv.glm(data = df_train_forward,
+                           glmfit = fit,
+                           K = 10)$delta[1]
+cv_CER = c(cv_CER,
+           cv_CER_null)
+cv_CER_se = c(cv_CER_se,
+              sd(cv_CER_null))
 num_predictors = c(num_predictors,
                    0)
 predictors_names = c(predictors_names,
@@ -425,28 +425,28 @@ used_predictors = c()
 for(k in 0:(p - 1)){
     print(p - 1 - k)
     # The p - k models that augment the predictors in one:
-    cv_deviance_k = c()
+    cv_CER_k = c()
     predictors_k = c()
     available_predictors = p_predictors[!(p_predictors %in% used_predictors)]
     for(j in 1:length(available_predictors)){
         additional_predictor = available_predictors[j]
-        cv_deviance_kj = cv_deviance_logit(predictors = c(used_predictors,
-                                                          additional_predictor),
-                                           df_model = df_train_forward)
-        cv_deviance_k = c(cv_deviance_k,
-                          cv_deviance_kj)
+        cv_CER_kj = cv_CER_logit(predictors = c(used_predictors,
+                                                additional_predictor),
+                                 df_model = df_train_forward)
+        cv_CER_k = c(cv_CER_k,
+                     cv_CER_kj)
         predictors_k = c(predictors_k,
                          additional_predictor)
     }
     
     # Choose the best submodel:
-    chosen_predictor = predictors_k[which(cv_deviance_k == min(cv_deviance_k))]
+    chosen_predictor = predictors_k[which(cv_CER_k == min(cv_CER_k))]
     used_predictors = c(used_predictors,
                         chosen_predictor)
-    cv_deviance = c(cv_deviance,
-                    min(cv_deviance_k))
-    cv_deviance_se = c(cv_deviance_se,
-                       sd(cv_deviance_k)/sqrt(nrow(df_train_forward)))
+    cv_CER = c(cv_CER,
+               min(cv_CER_k))
+    cv_CER_se = c(cv_CER_se,
+                  sd(cv_CER_k)/sqrt(nrow(df_train_forward)))
     num_predictors = c(num_predictors,
                        k + 1)
     predictors_names = c(predictors_names,
@@ -454,19 +454,19 @@ for(k in 0:(p - 1)){
                                collapse = ","))
 }
 
-# Deviance values:
+# CER values:
 df_eval = data.frame(
     "num_predictors" = num_predictors,
-    "cv_deviance" = cv_deviance,
-    "cv_deviance_se" = cv_deviance_se,
+    "cv_CER" = cv_CER,
+    "cv_CER_se" = cv_CER_se,
     "predictors" = predictors_names
 )
-df_eval$cv_deviance_se[is.na(df_eval$cv_deviance_se)] = 0
+df_eval$cv_CER_se[is.na(df_eval$cv_CER_se)] = 0
 
 # Best model with the 1-standard-error rule:
-min_cv_deviance = min(df_eval$cv_deviance)
+min_cv_CER = min(df_eval$cv_CER)
 for(i in 2:nrow(df_eval)){
-    if(df_eval$cv_deviance[i] - df_eval$cv_deviance_se[i] <= min_cv_deviance){
+    if(df_eval$cv_CER[i] - df_eval$cv_CER_se[i] <= min_cv_CER){
         best_p = i - 1
         break
     }
@@ -481,11 +481,11 @@ make_subset_selection_plot(df_eval = df_eval,
                            df_plot = df_eval,
                            best_predictors = best_predictors)
 
-# Estimated Test Deviance:
-test_deviance_forward = (df_eval %>%
-                             dplyr::filter(num_predictors == best_p))$cv_deviance
-test_deviance_se_forward = (df_eval %>%
-                               dplyr::filter(num_predictors == best_p))$cv_deviance_se
+# Estimated Test CER:
+test_CER_forward = (df_eval %>%
+                       dplyr::filter(num_predictors == best_p))$cv_CER
+test_CER_se_forward = (df_eval %>%
+                          dplyr::filter(num_predictors == best_p))$cv_CER_se
 
 # Best model from Forward Stepwise Selection - Logistic Regression:
 df_model = df_train_forward %>%
@@ -504,40 +504,61 @@ fit_ridge = glmnet::glmnet(x = X,
                            y = Y,
                            alpha = 0,
                            standardize = FALSE,
-                           family = "gaussian")
+                           family = "binomial")
 
 # K-Fold Cross-validation:
 cv_ridge = glmnet::cv.glmnet(x = X,
                              y = Y,
                              alpha = 0,
-                             type.measure = "mse",
+                             type.measure = "class",
                              nfolds = 10,
                              standardize = FALSE,
-                             family = "gaussian")
+                             family = "binomial")
 
 # Plot:
 make_shrinkage_plot(cv = cv_ridge,
                     model_type = "Ridge Regression",
-                    fig_path = "./figs/Ridge_Regression.png")
+                    fig_path = "./figs/Ridge.png")
 
-# Estimated Test Prediction Error:
-test_mse_ridge = cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
-test_mse_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
-
-
-
-
-
-
-
-
+# Estimated Test CER:
+test_CER_ridge = cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
+test_CER_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
 
 ###### Lasso - Logistic Regression
 
+# Matrix data:
+X = as.matrix(df_train_lasso[, p_predictors])
+Y = df_train_lasso[, response_var]
 
+# Fit:
+fit_lasso = glmnet::glmnet(x = X,
+                           y = Y,
+                           alpha = 1,
+                           standardize = FALSE,
+                           family = "binomial")
 
+# K-Fold Cross-validation:
+cv_lasso = glmnet::cv.glmnet(x = X,
+                             y = Y,
+                             alpha = 1,
+                             type.measure = "class",
+                             nfolds = 10,
+                             standardize = FALSE,
+                             family = "binomial")
+
+# Plot:
+make_shrinkage_plot(cv = cv_lasso,
+                    model_type = "The Lasso",
+                    fig_path = "./figs/Lasso.png")
+
+# Estimated Test CER:
+test_CER_lasso = cv_lasso$cvm[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
+test_CER_se_lasso = cv_lasso$cvsd[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
 
 ###### Principal Components Analysis - Logistic Regression
+
+
+
 
 
 

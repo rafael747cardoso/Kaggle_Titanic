@@ -7,15 +7,15 @@ make_shrinkage_plot = function(cv, model_type, fig_path){
     require(grid)
     require(gridExtra)
     
-    ### Deviance versus lambda
+    ### CER versus lambda
     
     model_fit = cv$glmnet.fit
     best_lambda = cv$lambda.1se
     
-    # Estimated Test Deviance:
-    df_deviance = data.frame(
-        "cv_deviance" = cv$cvm,
-        "cv_deviance_se" = cv$cvsd,
+    # Estimated Test CER:
+    df_CER = data.frame(
+        "cv_CER" = cv$cvm,
+        "cv_CER_se" = cv$cvsd,
         "lambdas" = cv$lambda,
         "d" = model_fit$df
     )
@@ -27,21 +27,21 @@ make_shrinkage_plot = function(cv, model_type, fig_path){
     # Plot:
     p1 = ggplot() +
     geom_point(
-        data = df_deviance,
+        data = df_CER,
         aes(
             x = log(lambdas),
-            y = cv_deviance
+            y = cv_CER
         ),
         color = "red",
         size = 2
     ) +
     geom_errorbar(
-        data = df_deviance,
+        data = df_CER,
         aes(
             x = log(lambdas),
-            y = cv_deviance,
-            ymin = cv_deviance - cv_deviance_se,
-            ymax = cv_deviance + cv_deviance_se
+            y = cv_CER,
+            ymin = cv_CER - cv_CER_se,
+            ymax = cv_CER + cv_CER_se
         ),
         width = 0.1
     ) +
