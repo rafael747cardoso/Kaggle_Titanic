@@ -26,11 +26,13 @@ source("./funcs/make_shrinkage_plot.R")
 source("./funcs/make_subset_selection_plot.R")
 source("./funcs/make_dim_reduc_plot.R")
 source("./funcs/make_comparison_plot.R")
-source("./funcs/make_mest_models_plot.R")
+source("./funcs/make_best_models_plot.R")
 source("./funcs/make_cv_knn_plot.R")
 source("./funcs/logit_reg_plots.R")
 source("./funcs/score_accuracy.R")
 source("./funcs/make_roc_curve.R")
+source("./funcs/regularized_logit_reg_plots.R")
+
 
 set.seed(111)
 
@@ -481,17 +483,19 @@ make_subset_selection_plot(df_eval = df_eval,
                            df_plot = df_eval,
                            best_predictors = best_predictors)
 
-# Estimated Test CER:
-test_CER_forward = (df_eval %>%
-                       dplyr::filter(num_predictors == best_p))$cv_CER
-test_CER_se_forward = (df_eval %>%
+# Estimated Test Accuracy:
+test_acc_forward = 1 - (df_eval %>%
+                           dplyr::filter(num_predictors == best_p))$cv_CER
+test_acc_se_forward = (df_eval %>%
                           dplyr::filter(num_predictors == best_p))$cv_CER_se
 
 # Best model from Forward Stepwise Selection - Logistic Regression:
 df_model = df_train_forward %>%
                dplyr::select(all_of(best_predictors),
                              all_of(response_var))
-logit_reg_plots(df_model = df_model)
+logit_reg_plots(df_model = df_model,
+                model_type = "Logistic Regression with Forward Selection",
+                fig_path = "./figs/Logit_Regr_Forward.png")
 
 ###### Ridge - Logistic Regression
 
@@ -520,13 +524,15 @@ make_shrinkage_plot(cv = cv_ridge,
                     model_type = "Ridge Regression",
                     fig_path = "./figs/Ridge.png")
 
-# Estimated Test CER:
-test_CER_ridge = cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
-test_CER_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
+# Estimated Test Accuracy:
+test_acc_ridge = 1 - cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
+test_acc_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
 
 # Best model from Ridge - Logistic Regression:
-
-
+regularized_logit_reg_plots(df_model = df_train_forward,
+                            best_lambda = cv_ridge$lambda.1se,
+                            model_type = "Ridge Regression",
+                            fig_path = "./figs/Logit_Regr_Ridge.png")
 
 ###### Lasso - Logistic Regression
 
@@ -555,17 +561,22 @@ make_shrinkage_plot(cv = cv_lasso,
                     model_type = "The Lasso",
                     fig_path = "./figs/Lasso.png")
 
-# Estimated Test CER:
-test_CER_lasso = cv_lasso$cvm[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
-test_CER_se_lasso = cv_lasso$cvsd[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
+# Estimated Test Accuracy:
+test_acc_lasso = 1 - cv_lasso$cvm[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
+test_acc_se_lasso = cv_lasso$cvsd[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
 
 # Best model from Lasso - Logistic Regression:
-
-
+regularized_logit_reg_plots(df_model = df_train_forward,
+                            best_lambda = cv_lasso$lambda.1se,
+                            model_type = "The Lasso",
+                            fig_path = "./figs/Logit_Regr_Lasso.png")
 
 ###### Principal Components Analysis - Logistic Regression
 
 # Principal components from PCA:
+
+
+
 
 # K-Fold Cross-validation:
 
@@ -598,53 +609,32 @@ test_CER_se_lasso = cv_lasso$cvsd[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
 
 ############ Prediction
 
-###### Estimation of the score
+### Predictions by type of model
 
-# Train/Test split:
-q = 0.5
-ind_test = sample(x = 1:nrow(df_train_stand),
-                  size = trunc(q*nrow(df_train_stand)),
-                  replace = FALSE)
-df_train2 = df_train_stand[-ind_test, ]
-df_test2 = df_train_stand[ind_test, ]
-X_df_test2 = df_test2 %>%
-                 dplyr::select(-all_of(response_var))
+# Training/Test split:
+q = 0.8
+n_all = nrow(df_train_stand)
+inds = sample(x = 1:n_all,
+              size = trunc(q*n_all))
+df_train = df_train_stand[inds, ]
+df_test = df_train_stand[-inds, ]
 
-# Forward Stepwise Selection - Logistic Regression:
-fit = glm(formula = paste(response_var, "~.",
-                          collapse = ""),
-          family = "binomial",
-          data = df_train2)
-probs = predict(object = fit,
-                newdata = df_test2,
+# Forward:
+fit_forward = glm(formula = paste(response_var, "~.",
+                                  collapse = ""),
+                  family = "binomial",
+                  data = df_train[, c(best_predictors, response_var)])
+probs = predict(object = fit_forward,
+                newdata = df_test,
                 type = "response")
 threshold = 0.5
 y_pred_forward = ifelse(probs > threshold,
                         1,
                         0)
-conf_matrix = table(y_pred_forward,
-                    df_test2[, response_var],
-                    dnn = c("Predicted", "Actual"))
-score_forward = score_accuracy(y_pred = y_pred_forward,
-                               y_real = df_test2[, response_var])
-
-# Ridge - Logistic Regression:
 
 
 
-# Lasso - Logistic Regression:
 
-
-
-# PCA - Logistic Regression:
-
-
-
-# Regularized Discriminant Analysis:
-
-
-
-# k-Nearest Neighbours:
 
 
 
@@ -652,27 +642,32 @@ score_forward = score_accuracy(y_pred = y_pred_forward,
 y_pred = data.frame(
     y_pred_forward,
     y_pred_ridge,
-    y_pred_lasso,
-    y_pred_pcalr,
-    y_pred_rda,
-    y_pred_knn
+    y_pred_lasso
+    # y_pred_pcalr,
+    # y_pred_rda,
+    # y_pred_knn
 ) %>%
     rowMeans()
 estimated_score_ensemble = score_accuracy(y_pred = y_pred,
-                                          y_real = df_test2[response_var])
+                                          y_real = df_test[response_var])
 
 # Compare the estimated scores:
 df_models_score = data.frame(
-    "models" = c("Forward Stepwise", "Ridge", "Lasso", "PCA LR", "RDA", "kNN", "Ensemble"),
-    "metric_name" = c(score_forward, score_ridge, score_lasso, score_pcalr, score_rda, 
-                      score_knn, score_ensemble),
-    "se_metric_name" = c(NA, NA, NA, NA, NA, NA, NA),
+    "models" = c("Forward Stepwise", "Ridge", "Lasso",
+                 #"PCA LR", "RDA", "kNN"
+                 "Ensemble"),
+    "metric_name" = c(score_forward, score_ridge, score_lasso,
+                      # score_pcalr, score_rda, score_knn,
+                      score_ensemble),
+    "se_metric_name" = c(NA, NA, NA, 
+                         # NA, NA, NA,
+                         NA),
     stringsAsFactors = FALSE
 )
-make_mest_models_plot(df_models = df_models_score,
+make_best_models_plot(df_models = df_models_score,
                       metric = "Score")
 
-###### Predict with an ensemble model
+###### Prediction with an ensemble model
 
 df_test_final = df_test_stand %>%
                      dplyr::select(-all_of(id_var))
@@ -694,22 +689,23 @@ y_pred_lasso = predict(fit_lasso,
                        standardize = FALSE,
                        family = "gaussian") %>%
                    as.numeric()
-y_pred_pcalr = predict(fit_pcalr,
-                       df_test_final) %>%
-                   as.numeric()
-y_pred_rda = predict(fit_rda,
-                     df_test_final) %>%
-                 as.numeric()
-y_pred_knn = predict(fit_knn,
-                     df_test_final) %>%
-                 as.numeric()
+# y_pred_pcalr = predict(fit_pcalr,
+#                        df_test_final) %>%
+#                    as.numeric()
+# y_pred_rda = predict(fit_rda,
+#                      df_test_final) %>%
+#                  as.numeric()
+# y_pred_knn = predict(fit_knn,
+#                      df_test_final) %>%
+#                  as.numeric()
+
 y_pred = data.frame(
     y_pred_forward,
     y_pred_ridge,
-    y_pred_lasso,
-    y_pred_pcalr,
-    y_pred_rda,
-    y_pred_knn
+    y_pred_lasso
+    # y_pred_pcalr,
+    # y_pred_rda,
+    # y_pred_knn
 ) %>%
     rowMeans()
 y_pred[y_pred < 0] = 0

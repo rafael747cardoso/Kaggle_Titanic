@@ -1,7 +1,7 @@
 
 ### Best models plot
 
-make_mest_models_plot = function(df_models, metric){
+make_best_models_plot = function(df_models, metric){
     ggplot() +
         geom_point(
             data = df_models,

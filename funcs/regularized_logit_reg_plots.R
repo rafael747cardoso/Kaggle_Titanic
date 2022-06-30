@@ -1,7 +1,7 @@
 
 ### Logistic regression plots
 
-logit_reg_plots = function(df_model, model_type, fig_path){
+regularized_logit_reg_plots = function(df_model, best_lambda, model_type, fig_path){
     
     # Train/test split:
     q = 0.8
@@ -10,29 +10,33 @@ logit_reg_plots = function(df_model, model_type, fig_path){
                   size = trunc(q*n_all))
     df_train = df_model[inds, ]
     df_test = df_model[-inds, ]
-    
+
     # Evaluation:
-    fit = glm(formula = paste(response_var, "~.",
-                              collapse = ""),
-              family = "binomial",
-              data = df_train)
+    X_train = as.matrix(df_train[, -which(names(df_train) == response_var)])
+    Y_train = df_train[, response_var]
+    X_test = as.matrix(df_test[, -which(names(df_test) == response_var)])
+    Y_test = df_test[, response_var]
+    fit = glmnet::glmnet(x = X_train,
+                         y = Y_train,
+                         alpha = 0,
+                         standardize = FALSE,
+                         family = "binomial",
+                         lambda = best_lambda)
     probs = predict(object = fit,
-                    newdata = df_test,
+                    newx = X_test,
                     type = "response")
     threshold = 0.5
     y_pred = ifelse(probs > threshold,
                     1,
                     0)
     conf_matrix = table(y_pred,
-                        df_test[, response_var],
+                        Y_test,
                         dnn = c("Predicted", "Actual"))
-
     score = score_accuracy(y_pred = y_pred,
-                           y_real = df_test[, response_var])
-
+                           y_real = Y_test)
     df_pred = data.frame("probs" = as.numeric(probs),
                          "y_pred" = y_pred,
-                         "y_real" = as.numeric(as.character(df_test[, response_var]))) %>%
+                         "y_real" = as.numeric(as.character(Y_test))) %>%
                   dplyr::arrange(probs)
     df_pred$rank = 1:nrow(df_pred)
     
@@ -335,5 +339,6 @@ logit_reg_plots = function(df_model, model_type, fig_path){
            width = 1900,
            height = 1080,
            units = "px")
+
 }
 
