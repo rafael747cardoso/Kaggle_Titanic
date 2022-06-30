@@ -17,6 +17,7 @@ require(Hmisc)
 require(ROCR)
 require(GGally)
 require(ggbiplot)
+require(klaR)
 
 source("./funcs/fix_bad_levels.R")
 source("./funcs/is_dummy.R")
@@ -608,15 +609,20 @@ test_acc_pcalr = 1 - df_best$cv_CER
 test_acc_se_pcalr = NA
 
 # Best model from PCA-LR:
-# df_pc = data.frame(pc$x[, 1:df_best$num_pc],
-#                    df_train_pcalr[response_var])
-df_pc = data.frame(pc$x[, 1:7],
+df_pc = data.frame(pc$x[, 1:df_best$num_pc],
                    df_train_pcalr[response_var])
 logit_reg_plots(df_model = df_pc,
                 model_type = "Logistic Regression with PCA",
                 fig_path = "./figs/Logit_Regr_PCA.png")
 
 ###### Regularized Discriminant Analysis
+
+df_train_rda
+
+
+
+
+
 
 
 
