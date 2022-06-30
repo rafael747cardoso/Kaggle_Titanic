@@ -575,6 +575,9 @@ regularized_logit_reg_plots(df_model = df_train_forward,
 
 # Principal components from PCA:
 
+df_train_pcalr
+
+
 
 
 
@@ -618,6 +621,10 @@ inds = sample(x = 1:n_all,
               size = trunc(q*n_all))
 df_train = df_train_stand[inds, ]
 df_test = df_train_stand[-inds, ]
+X_train = as.matrix(df_train[, p_predictors])
+Y_train = df_train[, response_var]
+X_test = as.matrix(df_test[, p_predictors])
+Y_test = df_test[, response_var]
 
 # Forward:
 fit_forward = glm(formula = paste(response_var, "~.",
@@ -625,12 +632,52 @@ fit_forward = glm(formula = paste(response_var, "~.",
                   family = "binomial",
                   data = df_train[, c(best_predictors, response_var)])
 probs = predict(object = fit_forward,
-                newdata = df_test,
-                type = "response")
+                newdata = df_test[, p_predictors],
+                type = "response") %>%
+            as.numeric()
 threshold = 0.5
 y_pred_forward = ifelse(probs > threshold,
                         1,
-                        0)
+                        0) %>%
+                     as.numeric()
+
+# Ridge:
+fit_ridge = glmnet::glmnet(x = X_train,
+                           y = Y_train,
+                           alpha = 0,
+                           standardize = FALSE,
+                           family = "binomial",
+                           lambda = cv_ridge$lambda.1se)
+probs = predict(object = fit_ridge,
+                newx = X_test,
+                type = "response")
+threshold = 0.5
+y_pred_ridge = ifelse(probs > threshold,
+                      1,
+                      0) %>%
+                   as.numeric()
+
+# Lasso:
+fit_lasso = glmnet::glmnet(x = X_train,
+                           y = Y_train,
+                           alpha = 0,
+                           standardize = FALSE,
+                           family = "binomial",
+                           lambda = cv_lasso$lambda.1se)
+probs = predict(object = fit_lasso,
+                newx = X_test,
+                type = "response")
+threshold = 0.5
+y_pred_lasso = ifelse(probs > threshold,
+                      1,
+                      0) %>%
+                   as.numeric()
+
+# PCA-LR:
+
+# RDA:
+
+# kNN:
 
 
 
@@ -639,27 +686,30 @@ y_pred_forward = ifelse(probs > threshold,
 
 
 # Ensemble model:
-y_pred = data.frame(
-    y_pred_forward,
-    y_pred_ridge,
-    y_pred_lasso
-    # y_pred_pcalr,
-    # y_pred_rda,
-    # y_pred_knn
-) %>%
-    rowMeans()
-estimated_score_ensemble = score_accuracy(y_pred = y_pred,
-                                          y_real = df_test[response_var])
+y_pred_ensemble = apply(
+    X = data.frame(
+            y_pred_forward,
+            y_pred_ridge,
+            y_pred_lasso
+            # y_pred_pcalr,
+            # y_pred_rda,
+            # y_pred_knn
+        ),
+    MARGIN = 1,
+    FUN = getmode
+)
+test_acc_ensemble = score_accuracy(y_pred = y_pred_ensemble,
+                                   y_real = Y_test)
 
 # Compare the estimated scores:
 df_models_score = data.frame(
     "models" = c("Forward Stepwise", "Ridge", "Lasso",
                  #"PCA LR", "RDA", "kNN"
                  "Ensemble"),
-    "metric_name" = c(score_forward, score_ridge, score_lasso,
-                      # score_pcalr, score_rda, score_knn,
-                      score_ensemble),
-    "se_metric_name" = c(NA, NA, NA, 
+    "metric_name" = c(test_acc_forward, test_acc_ridge, test_acc_lasso,
+                      # test_acc_pcalr, test_acc_rda, test_acc_knn,
+                      test_acc_ensemble),
+    "se_metric_name" = c(test_acc_se_forward, test_acc_se_ridge, test_acc_se_lasso, 
                          # NA, NA, NA,
                          NA),
     stringsAsFactors = FALSE
@@ -672,46 +722,68 @@ make_best_models_plot(df_models = df_models_score,
 df_test_final = df_test_stand %>%
                      dplyr::select(-all_of(id_var))
 
-y_pred_forward = predict(fit_forward,
-                         df_test_final) %>%
+# Forward:
+probs = predict(object = fit_forward,
+                newdata = df_test_final,
+                type = "response") %>%
+            as.numeric()
+threshold = 0.5
+y_pred_forward = ifelse(probs > threshold,
+                        1,
+                        0) %>%
                      as.numeric()
-y_pred_ridge = predict(fit_ridge,
-                       as.matrix(df_test_final),
-                       s = cv_ridge$lambda.1se,
-                       alpha = 1,
-                       standardize = FALSE,
-                       family = "gaussian") %>%
+
+# Ridge:
+probs = predict(object = fit_ridge,
+                newx = as.matrix(df_test_final),
+                type = "response")
+threshold = 0.5
+y_pred_ridge = ifelse(probs > threshold,
+                      1,
+                      0) %>%
                    as.numeric()
-y_pred_lasso = predict(fit_lasso,
-                       as.matrix(df_test_final),
-                       s = cv_lasso$lambda.1se,
-                       alpha = 1,
-                       standardize = FALSE,
-                       family = "gaussian") %>%
+
+# Lasso:
+probs = predict(object = fit_lasso,
+                newx = as.matrix(df_test_final),
+                type = "response")
+threshold = 0.5
+y_pred_lasso = ifelse(probs > threshold,
+                      1,
+                      0) %>%
                    as.numeric()
+
+# PCA-LR:
 # y_pred_pcalr = predict(fit_pcalr,
 #                        df_test_final) %>%
 #                    as.numeric()
+
+# RDA:
 # y_pred_rda = predict(fit_rda,
 #                      df_test_final) %>%
 #                  as.numeric()
+
+# kNN:
 # y_pred_knn = predict(fit_knn,
 #                      df_test_final) %>%
 #                  as.numeric()
 
-y_pred = data.frame(
-    y_pred_forward,
-    y_pred_ridge,
-    y_pred_lasso
-    # y_pred_pcalr,
-    # y_pred_rda,
-    # y_pred_knn
-) %>%
-    rowMeans()
-y_pred[y_pred < 0] = 0
+# Ensemble:
+y_pred_ensemble = apply(
+    X = data.frame(
+            y_pred_forward,
+            y_pred_ridge,
+            y_pred_lasso
+            # y_pred_pcalr,
+            # y_pred_rda,
+            # y_pred_knn
+        ),
+    MARGIN = 1,
+    FUN = getmode
+)
 df_pred = data.frame(
-    "Id" = df_test_stand$Id,
-    "SalePrice" = y_pred
+    "Id" = df_test_stand$PassengerId,
+    "SalePrice" = y_pred_ensemble
 )
 write.csv(df_pred,
           file = "./data/submission_ensemble.csv",
