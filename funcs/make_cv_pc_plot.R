@@ -1,55 +1,22 @@
 
-### Plot the Cross-validated MSE versus the number of predictors
+### CV CER by number of PC
 
-get_integer_breaks = function(input_vector, interval = 1){
-    minimum = floor(min(input_vector))
-    maximum = ceiling(max(input_vector))
-    breaks = seq(from = minimum,
-                 to = maximum,
-                 by = interval)
-    return(breaks)
-}
-
-make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
-
-    y_var_name = names(df_eval)[2]
-    names(df_eval)[1:3] = c("num_predictors", "cv_CER", "cv_CER_se")
-    names(df_plot)[1:3] = c("num_predictors", "cv_CER", "cv_CER_se")
-    
-    # Best models:
-    df_best = df_eval %>%
-                  dplyr::filter(predictors == paste(best_predictors, collapse = ','))
-
-    # Discart the null model:
-    df_plot = df_plot[2:nrow(df_plot), ]
-    df_eval = df_eval[2:nrow(df_eval), ]
-    
-    # CV MSE:
+make_cv_pc_plot = function(df_eval, df_best){
     ggplot() +
     geom_point(
         data = df_eval,
         aes(
-            x = num_predictors,
+            x = num_pc,
             y = cv_CER
         ),
         color = "gray",
         size = 1,
         alpha = 0.7
     ) +
-    geom_errorbar(
-        data = df_plot,
-        aes(
-            x = num_predictors,
-            y = cv_CER,
-            ymin = cv_CER - cv_CER_se,
-            ymax = cv_CER + cv_CER_se
-        ),
-        width = 0.1
-    ) +
     geom_line(
-        data = df_plot,
+        data = df_eval,
         aes(
-            x = num_predictors,
+            x = num_pc,
             y = cv_CER
         ),
         color = "red",
@@ -58,7 +25,7 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
     geom_point(
         data = df_best,
         aes(
-            x = num_predictors,
+            x = num_pc,
             y = cv_CER,
             colour = "Best model"
         ),
@@ -66,11 +33,11 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
         alpha = 1
     ) +
     scale_colour_manual(
-        name = paste0("p = ", df_best$num_predictors[1]),
+        name = paste0("p = ", df_best$num_pc[1]),
         values = c("Best model" = "blue")
     ) +
     scale_x_continuous(
-        breaks = get_integer_breaks(df_plot$num_predictors)
+        breaks = get_integer_breaks(df_eval$num_pc)
     ) +
     theme(
         axis.text.x = element_text(
@@ -110,7 +77,7 @@ make_subset_selection_plot = function(df_eval, df_plot, best_predictors){
             fill = "transparent"
         )
     ) +
-    xlab("Number of predictors") +
-    ylab(y_var_name)
+    xlab("Number of PC") +
+    ylab("CV CER")
 
 }

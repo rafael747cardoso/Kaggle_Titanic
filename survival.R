@@ -16,6 +16,7 @@ require(class)
 require(Hmisc)
 require(ROCR)
 require(GGally)
+require(ggbiplot)
 
 source("./funcs/fix_bad_levels.R")
 source("./funcs/is_dummy.R")
@@ -32,6 +33,8 @@ source("./funcs/logit_reg_plots.R")
 source("./funcs/score_accuracy.R")
 source("./funcs/make_roc_curve.R")
 source("./funcs/regularized_logit_reg_plots.R")
+source("./funcs/make_pc_plot.R")
+source("./funcs/make_cv_pc_plot.R")
 
 
 set.seed(111)
@@ -397,7 +400,7 @@ cv_CER_logit = function(predictors, df_model){
     return(cv_CER)
 }
 
-### K-Fold Cross-validated Deviance
+### K-Fold Cross-validated CER
 
 cv_CER = c()
 cv_CER_se = c()
@@ -574,28 +577,46 @@ regularized_logit_reg_plots(df_model = df_train_forward,
 ###### Principal Components Analysis - Logistic Regression
 
 # Principal components from PCA:
+pc = prcomp(df_train_pcalr[, p_predictors],
+            center = TRUE,
+            scale. = FALSE)
 
-df_train_pcalr
+# K-Fold Cross-validated CER:
+cv_CER = c()
+npc = dim(pc$x)[2]
+for(k in 1:npc){
+    df_pc_k = data.frame(pc$x[, 1:k],
+                         df_train_pcalr[response_var])
+    cv_CER = c(cv_CER,
+               cv_CER_logit(predictors = names(df_pc_k)[-(k + 1)],
+                            df_model = df_pc_k))
+}
+df_eval = data.frame(
+    "num_pc" = 1:npc,
+    "cv_CER" = cv_CER
+)
+df_best = df_eval %>%
+               dplyr::filter(cv_CER == min(df_eval$cv_CER))
 
+# Plots:
+make_pc_plot(pc = pc)
+make_cv_pc_plot(df_eval = df_eval,
+                df_best = df_best)
 
+# Estimated Test Accuracy:
+test_acc_pcalr = 1 - df_best$cv_CER
+test_acc_se_pcalr = NA
 
-
-
-# K-Fold Cross-validation:
-
-# Plot:
-
-# Estimated Test CER:
-
-# Best model from PCA - Logistic Regression:
-
-
-
-
-
-
+# Best model from PCA-LR:
+df_pc = data.frame(pc$x[, 1:df_best$num_pc],
+                   df_train_pcalr[response_var])
+logit_reg_plots(df_model = df_pc,
+                model_type = "Logistic Regression with PCA",
+                fig_path = "./figs/Logit_Regr_PCA.png")
 
 ###### Regularized Discriminant Analysis
+
+
 
 
 
@@ -625,6 +646,8 @@ X_train = as.matrix(df_train[, p_predictors])
 Y_train = df_train[, response_var]
 X_test = as.matrix(df_test[, p_predictors])
 Y_test = df_test[, response_var]
+df_pc_train = df_pc[inds, ]
+df_pc_test = df_pc[-inds, ]
 
 # Forward:
 fit_forward = glm(formula = paste(response_var, "~.",
@@ -674,8 +697,23 @@ y_pred_lasso = ifelse(probs > threshold,
                    as.numeric()
 
 # PCA-LR:
+fit_pcalr = glm(formula = paste(response_var, "~.",
+                                collapse = ""),
+                family = "binomial",
+                data = df_pc_train)
+probs = predict(object = fit_pcalr,
+                newdata = df_pc_test,
+                type = "response") %>%
+            as.numeric()
+threshold = 0.5
+y_pred_pcalr = ifelse(probs > threshold,
+                      1,
+                      0) %>%
+                   as.numeric()
 
 # RDA:
+
+
 
 # kNN:
 
@@ -690,8 +728,8 @@ y_pred_ensemble = apply(
     X = data.frame(
             y_pred_forward,
             y_pred_ridge,
-            y_pred_lasso
-            # y_pred_pcalr,
+            y_pred_lasso,
+            y_pred_pcalr
             # y_pred_rda,
             # y_pred_knn
         ),
@@ -703,14 +741,14 @@ test_acc_ensemble = score_accuracy(y_pred = y_pred_ensemble,
 
 # Compare the estimated scores:
 df_models_score = data.frame(
-    "models" = c("Forward Stepwise", "Ridge", "Lasso",
-                 #"PCA LR", "RDA", "kNN"
+    "models" = c("Forward Stepwise", "Ridge", "Lasso", "PCA LR",
+                 #"RDA", "kNN"
                  "Ensemble"),
-    "metric_name" = c(test_acc_forward, test_acc_ridge, test_acc_lasso,
-                      # test_acc_pcalr, test_acc_rda, test_acc_knn,
+    "metric_name" = c(test_acc_forward, test_acc_ridge, test_acc_lasso, test_acc_pcalr,
+                      # test_acc_rda, test_acc_knn,
                       test_acc_ensemble),
-    "se_metric_name" = c(test_acc_se_forward, test_acc_se_ridge, test_acc_se_lasso, 
-                         # NA, NA, NA,
+    "se_metric_name" = c(test_acc_se_forward, test_acc_se_ridge, test_acc_se_lasso, NA,
+                         # NA, NA,
                          NA),
     stringsAsFactors = FALSE
 )
@@ -754,9 +792,24 @@ y_pred_lasso = ifelse(probs > threshold,
                    as.numeric()
 
 # PCA-LR:
-# y_pred_pcalr = predict(fit_pcalr,
-#                        df_test_final) %>%
-#                    as.numeric()
+
+pc$rotation
+
+df_test_final
+
+
+df_pc_test
+
+
+probs = predict(object = fit_pcalr,
+                newdata = df_pc_test,
+                type = "response") %>%
+            as.numeric()
+threshold = 0.5
+y_pred_pcalr = ifelse(probs > threshold,
+                      1,
+                      0) %>%
+                   as.numeric()
 
 # RDA:
 # y_pred_rda = predict(fit_rda,
@@ -773,8 +826,8 @@ y_pred_ensemble = apply(
     X = data.frame(
             y_pred_forward,
             y_pred_ridge,
-            y_pred_lasso
-            # y_pred_pcalr,
+            y_pred_lasso,
+            y_pred_pcalr
             # y_pred_rda,
             # y_pred_knn
         ),
