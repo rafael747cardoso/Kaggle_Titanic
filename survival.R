@@ -782,13 +782,11 @@ y_pred_ensemble = apply(
     FUN = getmode
 )
 df_pred = data.frame(
-    "Id" = df_test_stand$PassengerId,
-    "SalePrice" = y_pred_ensemble
+    id = df_test_stand$PassengerId,
+    resp = y_pred_ensemble
 )
+names(df_pred) = c(id_var, response_var)
 write.csv(df_pred,
           file = "./data/submission_ensemble.csv",
           row.names = FALSE)
-
-
-
 
