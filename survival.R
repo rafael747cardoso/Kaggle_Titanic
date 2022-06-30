@@ -608,7 +608,9 @@ test_acc_pcalr = 1 - df_best$cv_CER
 test_acc_se_pcalr = NA
 
 # Best model from PCA-LR:
-df_pc = data.frame(pc$x[, 1:df_best$num_pc],
+# df_pc = data.frame(pc$x[, 1:df_best$num_pc],
+#                    df_train_pcalr[response_var])
+df_pc = data.frame(pc$x[, 1:7],
                    df_train_pcalr[response_var])
 logit_reg_plots(df_model = df_pc,
                 model_type = "Logistic Regression with PCA",
@@ -792,17 +794,13 @@ y_pred_lasso = ifelse(probs > threshold,
                    as.numeric()
 
 # PCA-LR:
-
-pc$rotation
-
-df_test_final
-
-
-df_pc_test
-
-
+pca = prcomp(df_test_final, 
+             center = TRUE,
+             scale = FALSE)
+df_pc_test = predict(pca,
+                     newdata = df_test_final)
 probs = predict(object = fit_pcalr,
-                newdata = df_pc_test,
+                newdata = as.data.frame(df_pc_test),
                 type = "response") %>%
             as.numeric()
 threshold = 0.5
@@ -840,6 +838,7 @@ df_pred = data.frame(
 )
 names(df_pred) = c(id_var, response_var)
 write.csv(df_pred,
-          file = "./data/submission_ensemble.csv",
+          file = "./data/submission_ensemble2.csv",
           row.names = FALSE)
+
 
