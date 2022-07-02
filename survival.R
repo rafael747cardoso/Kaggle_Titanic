@@ -46,6 +46,14 @@ set.seed(111)
 df_train = read.csv("./data/train.csv")
 df_test = read.csv("./data/test.csv")
 
+
+
+df_train = df_train[sample(x = 1:nrow(df_train), size = 30, replace = FALSE),]
+df_test = df_test[sample(x = 1:nrow(df_test), size = 15, replace = FALSE),]
+
+
+
+
 # Special variables:
 response_var = "Survived"
 id_var = "PassengerId"
@@ -168,9 +176,9 @@ for(i in 1:length(lastnames)){
     for(j in 1:length(firstnames)){
         ind = df_i$PassengerId[j]
         if(firstnames[j] %in% appeared){
-            df_all$with_spouse[ind] = "yes"
+            df_all$with_spouse[which(df_all$PassengerId == ind)] = "yes"
         } else{
-            df_all$with_spouse[ind] = "no"
+            df_all$with_spouse[which(df_all$PassengerId == ind)] = "no"
         }
         appeared = c(appeared,
                      firstnames[j])
