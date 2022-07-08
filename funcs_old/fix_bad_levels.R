@@ -1,5 +1,5 @@
 
-### Fix the levels for better dummification
+### Fix the levels
 
 fix_bad_levels = function(x){
     x = as.factor(x)

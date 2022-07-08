@@ -46,14 +46,6 @@ set.seed(111)
 df_train = read.csv("./data/train.csv")
 df_test = read.csv("./data/test.csv")
 
-
-
-df_train = df_train[sample(x = 1:nrow(df_train), size = 30, replace = FALSE),]
-df_test = df_test[sample(x = 1:nrow(df_test), size = 15, replace = FALSE),]
-
-
-
-
 # Special variables:
 response_var = "Survived"
 id_var = "PassengerId"
@@ -251,7 +243,7 @@ GGally::ggpairs(
 predctrs = c("Pclass", "Fare")
 
 # Cross-validation to find the best k in kNN:
-k_partitions = 10
+k_partitions = 5
 n_obs = nrow(df_withdeck)
 int_n_obs = k_partitions*n_obs%/%k_partitions
 X = 1:n_obs
@@ -537,7 +529,7 @@ make_shrinkage_plot(cv = cv_ridge,
                     fig_path = "./figs/Ridge.png")
 
 # Estimated Test Accuracy:
-test_acc_ridge = 1 - cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
+test_acc_ridge = 1 - cv_ridge$cvm[which(cv_ridge$lambda == cv_ridge$lambda.1se)][[1]]
 test_acc_se_ridge = cv_ridge$cvsd[which(cv_ridge$lambda == cv_ridge$lambda.1se)]
 
 # Best model from Ridge - Logistic Regression:
@@ -574,7 +566,7 @@ make_shrinkage_plot(cv = cv_lasso,
                     fig_path = "./figs/Lasso.png")
 
 # Estimated Test Accuracy:
-test_acc_lasso = 1 - cv_lasso$cvm[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
+test_acc_lasso = 1 - cv_lasso$cvm[which(cv_lasso$lambda == cv_lasso$lambda.1se)][[1]]
 test_acc_se_lasso = cv_lasso$cvsd[which(cv_lasso$lambda == cv_lasso$lambda.1se)]
 
 # Best model from Lasso - Logistic Regression:
