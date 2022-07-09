@@ -68,20 +68,42 @@ df_test = as.data.frame(samps$SAMP2)
 row.names(df_test) = df_test$rn
 df_test = df_test[, -1]
 
+# Matrices:
+X_train = as.matrix(df_train[, c(var_cat, var_num)])
+Y_train = df_train[, var_response]
+X_test = as.matrix(df_test[, c(var_cat, var_num)])
+Y_test = df_test[, var_response]
 
-df_all = rbind(df_train, df_test)
-ind_train = as.numeric(row.names(df_train))
-ind_test = as.numeric(row.names(df_test))
+############ Transform
 
-plot_density_2_sets(X = df_all$Cabin,
-                    ind_1 = ind_train,
-                    ind_2 = ind_test)
+###### Missing data
+
+X = X_train
+X_type = "train"
+
+deal_with_NA = function(X, X_type, var_cat, var_num){
+    
+    if()
+    
+    
+    
+    return(list(X, train_mean, train_median, train_mode))
+}
 
 
 
 
+###### Feature engineering
 
+###### Update variable types
 
+###### Dummy the categoric predictors
+
+###### Update variable types
+
+###### Predictors in common
+
+###### Scaling of the numeric (not dummy) predictors
 
 
 
