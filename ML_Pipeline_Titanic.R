@@ -14,7 +14,9 @@ require(dplyr)
 require(tidyr)
 require(fastDummies)
 require(Amelia)
-require(splitTools)
+
+require(splitstackshape)
+
 require(boot)
 require(glmnet)
 require(class)
@@ -52,20 +54,28 @@ var_num = df_availble %>%
               names()
 
 # Stratified Train/Test split:
+train_size = 0.8
+var_strata = c(var_response, "Sex", "Embarked")
+samps = splitstackshape::stratified(indt = df_available,
+                                    group = var_strata,
+                                    bothSets = TRUE,
+                                    keep.rownames = TRUE,
+                                    size = train_size)
+df_train = as.data.frame(samps$SAMP1)
+row.names(df_train) = df_train$rn
+df_train = df_train[, -1]
+df_test = as.data.frame(samps$SAMP2)
+row.names(df_test) = df_test$rn
+df_test = df_test[, -1]
 
-df1 = df_available %>% dplyr::select(Survived, Fare, Embarked)
-# df1$Embarked = as.factor(df1$Embarked)
 
-inds = splitTools::partition(y = df1$Survived,
-                             p = c(train = 0.8,
-                                   test = 0.2),
-                             type = "stratified"
-                             # type = "grouped"
-                             )
+df_all = rbind(df_train, df_test)
+ind_train = as.numeric(row.names(df_train))
+ind_test = as.numeric(row.names(df_test))
 
-plot_density_2_sets(X = df1$Embarked,
-                    ind_1 = inds$train,
-                    ind_2 = inds$test)
+plot_density_2_sets(X = df_all$Cabin,
+                    ind_1 = ind_train,
+                    ind_2 = ind_test)
 
 
 

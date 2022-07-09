@@ -18,6 +18,9 @@ plot_density_2_sets = function(X, ind_1, ind_2){
             stringsAsFactors = FALSE
         )
         X = df_lvls$X_num
+        is_cat = TRUE
+    } else{
+        is_cat = FALSE
     }
     
     X_1 = X[ind_1]
@@ -41,7 +44,7 @@ plot_density_2_sets = function(X, ind_1, ind_2){
     color_plus_std_2 = "#5b76f8"
 
     npoints = 2
-    plot_ly() %>%
+    p = plot_ly() %>%
         # X_1:
         add_trace(
             x = dens_1$x,
@@ -145,7 +148,9 @@ plot_density_2_sets = function(X, ind_1, ind_2){
             mode = "lines",
             line = list(color = color_mean_2),
             name = "Mean 2"
-        ) %>%
+        )
+    if(is_cat){
+        p = p  %>%
         layout(
             xaxis = list(
                 title = paste0("<b>X</b>"),
@@ -158,5 +163,19 @@ plot_density_2_sets = function(X, ind_1, ind_2){
             ),
             showlegend = TRUE
         )
+    } else{
+        p = p  %>%
+        layout(
+            xaxis = list(
+                title = paste0("<b>X</b>")
+            ),
+            yaxis = list(
+                title = paste0("<b>Density</b>")
+            ),
+            showlegend = TRUE
+        )
+    }
+    
+    return(p)
 }
 
