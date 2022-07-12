@@ -98,6 +98,14 @@ df_X_test = NA_resp_list[[1]]
 
 ###### Feature engineering
 
+df_X_train = feature_eng(X = df_X_train,
+                         var_cat = var_cat,
+                         var_num = var_num)
+
+df_X_test = feature_eng(X = df_X_test,
+                        var_cat = var_cat,
+                        var_num = var_num)
+
 
 
 
