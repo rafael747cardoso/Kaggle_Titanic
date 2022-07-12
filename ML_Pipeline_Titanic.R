@@ -110,13 +110,78 @@ df_X_test = feature_eng(X = df_X_test,
 
 ###### Update variable types
 
+# Train:
+var_cat_train = df_X_train %>%
+                    dplyr::select_if(~!is.numeric(.)) %>%
+                    names()
+var_num_train = df_X_train %>%
+                    dplyr::select_if(~is.numeric(.)) %>%
+                    names()
 
-
-
+# Test:
+var_cat_test = df_X_test %>%
+                   dplyr::select_if(~!is.numeric(.)) %>%
+                   names()
+var_num_test = df_X_test %>%
+                   dplyr::select_if(~is.numeric(.)) %>%
+                   names()
 
 ###### Dummy the categoric predictors
 
-###### Update variable types
+### Train
+
+# Replace special characters:
+for(var in var_cat_train){
+    df_X_train[, var] = fix_bad_levels(df_X_train[, var])
+}
+
+# One-hot-encoding:
+df_X_train_cats_dumm = fastDummies::dummy_cols(.data = df_X_train %>%
+                                                           dplyr::select(all_of(var_cat_train)),
+                                               select_columns = var_cat_train,
+                                               remove_selected_columns = TRUE,
+                                               remove_first_dummy = TRUE)
+var_dummy_train = names(df_X_train_cats_dumm)
+df_X_train = cbind(df_X_train %>%
+                       dplyr::select(-all_of(var_cat_train)),
+                   df_X_train_cats_dumm)
+
+### Test
+
+# Replace special characters:
+for(var in var_cat_test){
+    df_X_test[, var] = fix_bad_levels(df_X_test[, var])
+}
+
+# One-hot-encoding:
+df_X_test_cats_dumm = fastDummies::dummy_cols(.data = df_X_test %>%
+                                                          dplyr::select(all_of(var_cat_test)),
+                                              select_columns = var_cat_test,
+                                              remove_selected_columns = TRUE,
+                                              remove_first_dummy = TRUE)
+var_dummy_test = names(df_X_test_cats_dumm)
+df_X_test = cbind(df_X_test %>%
+                      dplyr::select(-all_of(var_cat_test)),
+                  df_X_test_cats_dumm)
+
+###### Update variable types  * intersect ... 
+
+# Train:
+var_num_train = df_X_train %>%
+                    dplyr::select_if(~is.numeric(.)) %>%
+                    names()
+
+# Test:
+var_cat_test = df_X_test %>%
+                   dplyr::select_if(~!is.numeric(.)) %>%
+                   names()
+var_num_test = df_X_test %>%
+                   dplyr::select_if(~is.numeric(.)) %>%
+                   names()
+
+
+
+
 
 ###### Predictors in common
 
